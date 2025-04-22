@@ -1,0 +1,59 @@
+module TransferAgent where
+
+import DA.List (head)
+import DA.Foldable (forA_)
+import DA.Action (void, when)
+
+template Token 
+  with
+    issuer : Party
+    symbol : Text
+    owner : Party
+    amount : Decimal
+  where
+    signatory issuer
+    observer owner
+    ensure amount > 0.0
+
+template KYCCredential 
+  with
+    issuer: Party
+    holder: Party
+  where
+    signatory issuer
+    observer holder
+    key (issuer,holder) : (Party, Party)
+    maintainer key._1
+
+template AssetRegistry
+  with
+    admin : Party
+  where
+    signatory admin
+
+    nonconsuming choice Execute_Transfer : ()
+      with
+        sender : Party
+        sourceFunds : [ContractId Token]
+        transfers : [(Party,Decimal)]
+      controller sender
+      do
+        -- check the recipient holds KYC credential
+        credentialsData <- forA_ (map fst transfers) (\x -> fetchByKey @KYCCredential (admin,x))
+        -- check the validity of source funds
+        sourceFundsData <- forA sourceFunds fetch 
+        let 
+          issuer = (head sourceFundsData).issuer
+          symbol = (head sourceFundsData).symbol
+          totalSourceFunds = foldl (\acc tkn -> acc + tkn.amount) 0.0 sourceFundsData
+          change = totalSourceFunds - sum (map snd transfers)
+        assertMsg "Invalid source funds" $
+          foldl (\acc tkn -> acc && (tkn.issuer==issuer) && (tkn.symbol==symbol)) True sourceFundsData
+        assertMsg "Insufficient source funds" $ change >= 0.0
+        
+        -- execute transfer
+        forA_ sourceFunds archive 
+        forA_ transfers \(recipient,amount) -> create Token {issuer,symbol,owner=recipient,amount}
+        when (change > 0.0) do
+          void $ create Token {issuer,symbol,owner=sender,amount = totalSourceFunds - sum (map snd transfers)}
+

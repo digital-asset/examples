@@ -1,0 +1,1 @@
+This example accompanies the series of blog articles on [tokenization of real world assets](https://blog.digitalasset.com/blog/tokenization-of-rwas-on-canton-network-vs-evm-chains-part-1) (RWAs) on Canton Network aimed at the developers with previous experience in Solidity and Ethereum Virtual Machine (EVM) and no experience with Daml.

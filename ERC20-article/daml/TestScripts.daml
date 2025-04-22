@@ -1,0 +1,26 @@
+module TestScripts where
+
+import Daml.Script
+import TransferAgent
+
+test = script do
+  issuer <- allocateParty "Issuer"
+  alice <- allocateParty "Alice"
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+
+  -- Create Asset Registry
+  arCid <- submit issuer do createCmd AssetRegistry {admin=issuer}
+  Some taDisclosure <- queryDisclosure issuer arCid
+  -- Issuer creates asset
+  aliceFunds <- mapA (\amt -> submit issuer do createCmd Token {issuer,symbol = "TKN",owner = alice,amount = amt}) 
+    [10.0,5.0,3.0]
+  -- Issuer creates credentials
+  bobCredCid <- submit issuer do createCmd KYCCredential {issuer, holder=bob}
+  charlieCredCid <- submit issuer do createCmd KYCCredential {issuer, holder=charlie}
+  Some bobCredDisclosure <- queryDisclosure issuer bobCredCid
+  Some charlieCredDisclosure <- queryDisclosure issuer charlieCredCid
+  -- Alice transfers some funds to Bob and Charlie
+  submitWithDisclosures alice [taDisclosure,bobCredDisclosure,charlieCredDisclosure] do 
+    exerciseCmd arCid Execute_Transfer {sender=alice,sourceFunds=aliceFunds,transfers=[(bob,3.0),(charlie,8.0)]}
+  return ()
