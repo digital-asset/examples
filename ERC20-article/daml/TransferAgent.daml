@@ -80,4 +80,3 @@ template AssetRegistry
         -- if any change is left after the transfers, create the contract for the unspent amount
         when (change > 0.0) do
           void $ create Token {issuer,symbol,owner=sender,amount = totalSourceFunds - sum (map snd transfers)}
-
